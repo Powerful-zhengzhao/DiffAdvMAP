@@ -1,0 +1,39 @@
+name: DiffAdvMAP
+channels:
+  - pytorch
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip=25.3
+  - cudatoolkit=11.8
+  - pytorch=2.7.0
+  - torchvision=0.22.0
+  - numpy=1.26.4
+  - pandas=2.2.1
+  - tqdm
+  - pyYaml
+  - pillow
+  - filelock
+  - joblib
+  - gitpython
+  - gdown
+  - pip:
+    - pyiqa==0.1.14.1
+    - numpy == 1.26.4
+    - adversarial_robustness_toolbox==1.13.1
+    - eagerpy==0.30.0
+    - natsort==8.2.0
+    - timm==0.9.16
+    - Pillow==9.2.0
+    - pretrainedmodels==0.7.4
+    - lpips == 0.1.4
+    - blobfile==2.0.2
+    - transformers==4.37.2
+    - kornia==0.8.1
+    - omegaconf==2.3.0
+    - pytorch-lightning==1.5.1
+    - torchmetrics==1.8.2
+    - pydeprecate==0.3.1
+
+
