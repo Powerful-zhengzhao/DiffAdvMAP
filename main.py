@@ -102,16 +102,25 @@ def prepare_data(config,target_model):
             label_path = './CUB_200_2011/labels.txt'
         elif 'Car' in config.input_image:
             label_path = './Stanford_Car/labels.txt'
-
-        with open(label_path, 'r') as file:
-            content = file.read()
-            lines = content.split('\n')
-            for i, line in enumerate(lines):
-                image_name = str(i + 1) + '.png'
-                origin_label = int(line.strip()) - 1
+        if config.mode == 'purify':
+            imgs = os.listdir(config.input_image)
+            for img in imgs:
+                image_name = img
+                origin_label = int(img.split('_')[0])
                 label_dict[image_name] = origin_label
+        else:
+            with open(label_path, 'r') as file:
+                content = file.read()
+                lines = content.split('\n')
+                for i, line in enumerate(lines):
+                    image_name = str(i+1) + '.png'
+                    origin_label = int(line.strip()) - 1
+                    label_dict[image_name] = origin_label
             file.close()
-        m_avg = comupte_average_complexity(config)
+        if config.mode == 'perturbation_attack':
+            m_avg = comupte_average_complexity(config)
+        else:
+            m_avg = 1
 
         for key,value in label_dict.items():
             image_name = key
@@ -119,7 +128,8 @@ def prepare_data(config,target_model):
             image_path = os.path.join(gt_pth, image_name)
             image = normalize(Image.open(image_path).convert("RGB"))
             if config.mode == "perturbation_attack":
-                mask_name = image_name.split('.')[0] + '.png'
+                # mask_name = image_name.split('.')[0] + '.png'
+                mask_name = str(int(image_name.split('.')[0])) + '.png'
                 mask_path = os.path.join(masks_path, mask_name)
                 m = Image.open(mask_path).convert("1")
                 mask = (
@@ -144,6 +154,15 @@ def prepare_data(config,target_model):
                 mask_name = image_name.split('.')[0] + '.png'
                 mask_path = os.path.join(masks_path, mask_name)
                 m = Image.open(mask_path).convert("1").resize((224, 224))
+                mask = (
+                    torch.from_numpy(1 - np.array(m, dtype=np.float32))
+                    .unsqueeze(0)
+                    .unsqueeze(0)
+                )
+            elif config.mode == "purify":
+                mask_name = image_name.split('_')[1]
+                mask_path = os.path.join(masks_path, mask_name)
+                m = Image.open(mask_path).convert("1")
                 mask = (
                     torch.from_numpy(1 - np.array(m, dtype=np.float32))
                     .unsqueeze(0)
@@ -294,7 +313,7 @@ def main():
         print('loading image {} for model {}'.format(image_name, config.target_model))
         # prepare save dir
         if config.regional == True:
-            outpath = os.path.join(outpath, "regional")
+            outpath = os.path.join(config.outdir, "regional")
         else:
             outpath = config.outdir
         outpath = os.path.join(outpath, config.target_model)

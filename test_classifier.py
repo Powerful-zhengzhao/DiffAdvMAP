@@ -27,13 +27,7 @@ def normalize(image, shape=(224, 224)):
     image = image[None].permute(0, 3, 1, 2)
     return image
 
-def test_classifier():
-    parser = argparse.ArgumentParser(description="UAEs evaluation")
-    parser.add_argument('--use_specific_path',type= bool, default=False,)
-    parser.add_argument('--specific_path',type=str, default = None)
-    parser.add_argument('--config',type=str, default = "configs/imagenet_perturb.yaml")
-    parser.add_argument('--input_image', type = str, default = "./imagenet-compatible/images/")
-    args = parser.parse_args()
+def test_classifier(args):
     config_file = args.config
     specific_path = args.specific_path
     use_specific_path = args.use_specific_path
@@ -70,5 +64,10 @@ def test_classifier():
     print("average lpips is {}".format(np.sum(lp)/len(lp)))
 
 if __name__ == '__main__':
-
-    test_classifier()
+    parser = argparse.ArgumentParser(description="UAEs evaluation")
+    parser.add_argument('--use_specific_path',type= bool, default=True)
+    parser.add_argument('--specific_path',type=str, default = None)
+    parser.add_argument('--config',type=str, default = "configs/imagenet_perturb.yaml")
+    parser.add_argument('--input_image', type = str, default = "./imagenet-compatible/images/")
+    args = parser.parse_args()
+    test_classifier(args)
