@@ -513,14 +513,15 @@ def get_adaptive_t_star(
     tao: float = 0.4,
 ) -> torch.Tensor:
 
-    # c_max_dict = {'mobilenet-v2': 60, 'vgg': 100, 'swin_transformal': 38,'cubResnet50': 120, 'cubSEResnet154': 100, 'cubSEResnet101': 170, 'carResnet50': 200,'carSEResnet101': 200, 'carSEResnet154': 85 }
-    c_max_dict = {'mobilenet-v2': 60, 'vgg': 100, 'swin_transformal': 38, 'cubResnet50': 120, 'cubSEResnet154': 100,'cubSEResnet101': 170, 'carResnet50': 200, 'carSEResnet101': 200, 'carSEResnet154': 85}
+    c_max_dict = {'mobilenet-v2': 60, 'vgg': 100, 'swin-transformer': 38, 'cubResnet50': 120, 'cubSEResnet154': 100,'cubSEResnet101': 170, 'carResnet50': 200, 'carSEResnet101': 200, 'carSEResnet154': 85}
     if 'cub' in target_model_name:
         t_min = 15
         c_min = 60
-    if target_model_name== 'swin-transformer':
+    if target_model_name=='swin-transformer':
         c_min = 30
         t_min = 19
+    elif target_model_name=='cubSEResnet101':
+        c_min = 90
     if target_model_name in c_max_dict.keys():
         c_max = c_max_dict[target_model_name]
     with torch.no_grad():

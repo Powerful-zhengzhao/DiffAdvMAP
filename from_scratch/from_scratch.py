@@ -28,7 +28,11 @@ parser.add_argument('--ddim-steps', type=int, default=200)
 parser.add_argument('--ddim-eta', type=float, default=0.0)
 parser.add_argument('--mask', type=bool, default=True)
 parser.add_argument('--save-dir', type=str, default='../images/imagenetsc/')
-parser.add_argument('--target-model', type=str, default="Pure_Resnet50")
+parser.add_argument('--target-model', type=str, default="inception-v3")
+parser.add_argument('--adaptive', type=bool, default=True)
+parser.add_argument('--const', type=float, default=-30)
+parser.add_argument('--lr', type=float, default=0.03)
+parser.add_argument('--iterations', type=int, default=2)
 args = parser.parse_args()
 
 def load_model_from_config(config, ckpt):
@@ -91,7 +95,7 @@ def main():
     
     model = get_model()
     vic_model = prepare_target_model(args.target_model, device)
-    sampler = DDIMSampler(model, vic_model=vic_model)
+    sampler = DDIMSampler(model, args, vic_model=vic_model)
     n_samples_per_class = args.batch_size
 
     ddim_steps = args.ddim_steps
@@ -118,7 +122,8 @@ def main():
                                                  unconditional_guidance_scale=scale,
                                                  unconditional_conditioning=uc,
                                                  eta=ddim_eta,
-                                                 label=xc.to(model.device)
+                                                 label=xc.to(model.device),
+                                                 args=args,
                                                  )
 
                 x_samples_ddim = model.decode_first_stage(samples_ddim)

@@ -19,6 +19,16 @@ from PIL import Image, ImageEnhance
 from from_scratch import clip
 import kornia.color as Color
 import kornia
+import time
+import csv
+
+exp_a_csv_path = "experiment_a_metrics.csv"
+
+# 如果文件不存在，初始化表头
+if not os.path.exists(exp_a_csv_path):
+    with open(exp_a_csv_path, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['timestep', 'forward_mse', 'backward_cossim'])
 def noise_like(shape, device, repeat=False):
     def repeat_noise():
         return torch.randn((1, *shape[1:]), device=device).repeat(
@@ -438,8 +448,9 @@ class A_DDIMSampler(DDIMSampler):
         self.regional = conf.get("regional",False)
         self.dataset_name = conf.get("dataset_name","imagenet")
         self.color_guidance_strength = self.conf.get("color_guidance_strength", 1.0)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.adaptive = conf.get('adaptive','False')
+        self.one_step = conf.get('one_step','True')
         if self.mode == 'style':
             content_layers_default = ['conv_4']
             style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
@@ -457,7 +468,6 @@ class A_DDIMSampler(DDIMSampler):
             const,
             target_model,
             target_label,
-            purify,
             iters,
             model_kwargs,
             lr_xt,
@@ -478,14 +488,6 @@ class A_DDIMSampler(DDIMSampler):
                 else:
                     ret = self.coef_adv_reg * (const - (j - i)) ** 2 + self.coef_recon_reg * torch.sum(
                         ( _x0 -  _pred_x0) ** 2)
-                return ret
-
-        elif self.mode == 'purify':
-            def loss_fn(_x0, _pred_x0, _mask, const, target_model, target_label, _x):
-
-                i,j = get_entries(_pred_x0, target_model,target_label)
-                ret = self.coef_adv_reg * torch.sum((const - (j - i)) ** 2) + self.coef_recon_reg * torch.sum(
-                        (_x0 - _pred_x0) ** 2)
                 return ret
 
         elif  self.mode == 'style':
@@ -568,6 +570,7 @@ class A_DDIMSampler(DDIMSampler):
 
         def get_smart_lr_decay_rate(_t, interval_num):
             int_t = int(_t[0].item())
+            interval_num = min(interval_num, max(1, int_t))
             interval = int_t // interval_num
             steps = (
                 (np.arange(0, interval_num) * interval)
@@ -592,6 +595,8 @@ class A_DDIMSampler(DDIMSampler):
 
         def multistep_predx0(_x, _et, _t, interval_num):
             int_t = int(_t[0].item())
+            interval_num = min(interval_num,max(1,int_t))
+
             interval = int_t // interval_num
             steps = (
                 (np.arange(0, interval_num) * interval)
@@ -690,10 +695,16 @@ class A_DDIMSampler(DDIMSampler):
         with torch.enable_grad():
             origin_x = x.clone().detach()
             x = x.detach().requires_grad_()
+
+            torch.cuda.reset_peak_memory_stats()
+            start_time = time.time()
+
             e_t = get_et(_x=x, _t=t)
+
             pred_x0 = get_predx0(
                 _x=x, _t=t, _et=e_t, interval_num=self.mid_interval_num
             )
+
 
             prev_loss = loss_fn(x0, pred_x0, mask, const, target_model, target_label, x).item()
             logging_info(f"step: {t[0].item()} lr_xt {lr_xt:.8f}")
@@ -702,13 +713,47 @@ class A_DDIMSampler(DDIMSampler):
                 loss = loss_fn(x0, pred_x0, mask, const, target_model, target_label, x) + \
                        coef_xt_reg * reg_fn(origin_x, x)
 
-                if self.mode == 'purify':
-                    new_x = x
-                    del loss
-                    break
                 x_grad = torch.autograd.grad(
                     loss, x, retain_graph=False, create_graph=False
                 )[0].detach()
+
+                if self.mid_interval_num==1 and step == 0 and False:
+                    K_STEPS = 4
+                    try:
+                        x_k = origin_x.clone().detach().requires_grad_()
+                        e_t_k = get_et(_x=x_k, _t=t)
+                        pred_x0_k = get_predx0(_x=x_k, _t=t, _et=e_t_k, interval_num=K_STEPS)
+                        forward_mse = F.mse_loss(pred_x0.detach(), pred_x0_k.detach())
+
+                        loss_k = loss_fn(x0, pred_x0_k, mask, const, target_model, target_label, x_k) + \
+                                 coef_xt_reg * reg_fn(origin_x, x_k)
+
+                        x_grad_k = torch.autograd.grad(
+                            loss_k, x_k, retain_graph=False, create_graph=False
+                        )[0].detach()
+
+                        # 计算余弦相似度
+                        cos_sim = F.cosine_similarity(x_grad.flatten(), x_grad_k.flatten(), dim=0)
+                        with open(exp_a_csv_path,mode='a',newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([t[0].item(), forward_mse, cos_sim])
+
+                        logging_info(
+                            f"--> [Exp A] t={t[0].item():.0f} | "
+                            f"Forward MSE (1 vs {K_STEPS}): {forward_mse.item():.5f} | "
+                            f"Backward CosSim: {cos_sim.item():.4f}"
+                        )
+
+                        del x_k, e_t_k, pred_x0_k, loss_k, x_grad_k
+                        torch.cuda.empty_cache()
+                    except Exception as e:
+                        logging_info(f"--> [Exp A] K-step gradient calculation failed (likely OOM): {e}")
+
+                if step == self.num_iteration_optimize_xt - 1:  # 在最后一步统计
+                    end_time = time.time()
+                    peak_vram = torch.cuda.max_memory_allocated() / (1024 ** 2)  # 转换为 MB
+                    logging_info(
+                        f"--> [Exp B] Steps: {self.mid_interval_num}, Time: {end_time - start_time:.3f}s, Peak VRAM: {peak_vram:.2f} MB")
 
                 if torch.norm(x_grad, p=2).isnan():
                     new_x = x
@@ -716,7 +761,7 @@ class A_DDIMSampler(DDIMSampler):
                     new_x = x - lr_xt * x_grad
 
                 if self.mode == 'perturbation_attack':
-                    if self.dataset_name== 'imagenet' :
+                    if self.dataset_name == 'imagenet':
                         new_x = torch.clamp(new_x, min=origin_x-0.05, max=origin_x+0.05)
                     else:
                         new_x = torch.clamp(new_x, min=origin_x - 0.5, max=origin_x + 0.5)
@@ -795,7 +840,7 @@ class A_DDIMSampler(DDIMSampler):
         coef_xt_reg = self.coef_xt_reg
         loss = None
         if not self.adaptive:
-            t_star = 20
+            t_star = 19
             adaptive_const = -conf['const']
         if device is None:
             device = next(model_fn.parameters()).device
@@ -815,13 +860,6 @@ class A_DDIMSampler(DDIMSampler):
                 alphas = _extract_into_tensor(self.alphas_cumprod, t, xT_shape)
                 img =alphas.sqrt()*origin_x+(1-alphas).sqrt()*torch.randn(xT_shape, device=device)
                 const = -adaptive_const
-            elif self.mode == "purify":
-                time = self.steps[-150]
-                t = torch.tensor([time] * xT_shape[0], device=device)
-                alphas = _extract_into_tensor(self.alphas_cumprod, t, xT_shape)
-                img =alphas.sqrt()*origin_x+(1-alphas).sqrt()*torch.randn(xT_shape, device=device)
-                # const = -adaptive_const
-                const = conf['const']
             elif self.mode == "colorization":
                 time = self.steps[-20]
                 t = torch.tensor([time] * xT_shape[0], device=device)
@@ -849,7 +887,6 @@ class A_DDIMSampler(DDIMSampler):
                         const=const,
                         target_model=target_model,
                         target_label=target_label,
-                        purify=False,
                         model_kwargs=model_kwargs,
                         pred_xstart=None,
                         lr_xt=self.lr_xt,
@@ -876,7 +913,6 @@ class A_DDIMSampler(DDIMSampler):
                     const=const,
                     target_model=target_model,
                     target_label=target_label,
-                    purify=False,
                     iters=i,
                     model_kwargs=model_kwargs,
                     pred_xstart=None,

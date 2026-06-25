@@ -79,6 +79,7 @@ def prepare_model(algorithm, conf, device):
     return unet, sampler
 
 def prepare_data(config,target_model):
+    device = "cuda"
     index_path = json.load(open(config.index_path))
     if config.resume==True:
         save_path = os.path.join(config.outdir,config.target_model, 'samples')
@@ -168,7 +169,7 @@ def prepare_data(config,target_model):
                     .unsqueeze(0)
                     .unsqueeze(0)
                 )
-            t_star, adaptive_const = get_adaptive_t_star(image.cuda(), target_model=target_model,
+            t_star, adaptive_const = get_adaptive_t_star(image.to(device), target_model=target_model,
                                                          origin_label=origin_label,
                                                          target_model_name=config.target_model,
                                                          m_avg=m_avg)
@@ -177,7 +178,7 @@ def prepare_data(config,target_model):
     else:
         image = normalize(Image.open(gt_pth).convert("RGB"))
 
-        out_image = (image / 2 + 0.5).clamp(0, 1).cuda()
+        out_image = (image / 2 + 0.5).clamp(0, 1).to(device)
         out_image = out_image.permute(0, 2, 3, 1)
         mean = torch.as_tensor([0.485, 0.456, 0.406], dtype=out_image.dtype, device=out_image.device)
         std = torch.as_tensor([0.229, 0.224, 0.225], dtype=out_image.dtype, device=out_image.device)
@@ -269,7 +270,7 @@ def main():
     ###################################################################################
     config = Config(default_config_file="configs/imagenet_perturb.yaml", use_argparse=True)
     # config.show()
-    device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     all_paths = get_all_paths(config.outdir)
     config.dump(all_paths["path_config"])

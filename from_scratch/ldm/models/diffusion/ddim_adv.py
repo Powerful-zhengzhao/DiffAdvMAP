@@ -39,16 +39,15 @@ def get_target_label(logits, label, device): # seond-like label for attack
 
 
 class DDIMSampler(object):
-    def __init__(self, model, schedule="linear", vic_model=None, **kwargs):
+    def __init__(self, model, args, schedule="linear", vic_model=None, **kwargs):
         
         super().__init__()
         self.model = model
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
-        
         self.vic_model = vic_model
-
-        
+        self.args = args
+        self.reg_coef_recon = self.args.target_model != 'inception-v3'
 
 
     def register_buffer(self, name, attr):
@@ -212,9 +211,13 @@ class DDIMSampler(object):
     @torch.no_grad()
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
-                      unconditional_guidance_scale=1., unconditional_conditioning=None,img_origin=None, label=None, reference=None, const=-30,lr_xt=0.01):
+                      unconditional_guidance_scale=1., unconditional_conditioning=None,img_origin=None, label=None, reference=None):
         b, *_, device = *x.shape, x.device
         total_steps = self.ddim_timesteps.shape[0]
+        const = self.args.const
+        lr_xt = self.args.lr
+        iterations = self.args.iterations
+
         if unconditional_conditioning is None or unconditional_guidance_scale == 1.:
             e_t = self.model.apply_model(x, t, c)
             if reference is None and total_steps * 0 < index <= total_steps * 0.2:
@@ -272,9 +275,10 @@ class DDIMSampler(object):
                 logits_origin = self.vic_model(img_transformed_origin)
                 probs = F.softmax(logits_origin)
                 prob = probs[0, label]
-                const = const - 10 * prob
+                if self.args.adaptive:
+                    const = const - 10 * prob
 
-                for step in range(3):
+                for step in range(iterations):
                     img_transformed = self.model.differentiable_decode_first_stage(
                         pred_x0)  # image transformation from latent code
                     img_transformed = torch.clamp((img_transformed + 1.0) / 2.0,
@@ -287,8 +291,7 @@ class DDIMSampler(object):
                     one_hot_labels = temp[label].to(pred_x0.device)
                     i, _ = torch.max((1 - one_hot_labels) * logits, dim=1)
                     j = torch.masked_select(logits, one_hot_labels.bool())
-
-                    ret = (const - (j - i)) ** 2 + torch.sum((origin_pred_x0 - pred_x0) ** 2)
+                    ret = (const - (j - i)) ** 2 + self.reg_coef_recon*torch.sum((origin_pred_x0 - pred_x0) ** 2)
                     loss = ret+0.01*torch.sum((origin_x - x) ** 2)
 
                     x_grad = torch.autograd.grad(
