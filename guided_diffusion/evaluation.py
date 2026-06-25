@@ -28,9 +28,6 @@ from torch_nets import (
 from art.estimators.classification import PyTorchClassifier
 import pytorch_fid.fid_score as fid_score
 from Finegrained_model import model as otherModel
-os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
-os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
-# os.environ["HF_ENDPOINT"] = 'https://hf-mirror.com'
 
 def model_selection(name,batch_size = 50):
     if name == "Pure_Resnet50":
@@ -117,7 +114,7 @@ def normalize(image,adv_path,shape=(224, 224)):
         image = image[:,:,16:240,16:240]
 
     return image
-def evaluation(config,specific_path = None):
+def evaluation(config,adversarial_trained,specific_path = None):
     res = 224
     nb_classes = 1000
     all_accuracy = []
@@ -277,7 +274,7 @@ def evaluation(config,specific_path = None):
 
 
 
-    if config.target_model == 'inception-v3':
+    if adversarial_trained == True:
         for name in robust_models_name:
             images = []
             origin_labels = []
