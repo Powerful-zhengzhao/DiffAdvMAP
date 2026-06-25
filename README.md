@@ -85,7 +85,7 @@ python test_classifier.py --config_file <config_file> --use_specific_path <True 
 If `use_pecific_path` is `False`, UAEs in config file's default image folder will be evaluated
 ## Robustness on defensive approches
 Apart from the adversarially trained models, we also evaluate our attack's power to deceive other defensive approaches as displayed in Section 4.C.2) in our paper, their implementations are as follows:
-- Adversarially trained models (Adv-Inc-v3, Inc-v3<sub>ens3</sub>, Inc-v3<sub>ens4</sub>, IncRes-v2<sub>ens</sub>): Run the code in [Robustness on other normally trained models](#robustness-on-other-normally-trained-models).
+- Adversarially trained models (Adv-Inc-v3, Inc-v3<sub>ens3</sub>, Inc-v3<sub>ens4</sub>, IncRes-v2<sub>ens</sub>): Run the code in [Evaluation](#Evaluation), you can download the pretrained weights from [here](https://github.com/ylhz/tf_to_pytorch_model) and then place them into the directory `pretrained_models`.
 - [R&P](https://github.com/cihangxie/NIPS2017_adv_challenge_defense): Since our target size is 224, we reset the image scale augmentation proportionally (232~248). Then run the original code.
 - [NIPS-r3](https://github.com/anlthms/nips-2017/tree/master/mmd): Since its ensembled models failed to process inputs with 224 size, we run its original code that resized the inputs to 299 size.
 - [SR](https://github.com/aamir-mustafa/super-resolution-adversarial-defense): Change the input size to 224 then run the original code.
