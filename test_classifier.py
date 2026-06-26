@@ -70,10 +70,10 @@ def test_classifier(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="UAEs evaluation")
-    parser.add_argument('--use_specific_path',type= bool, default=True)
+    parser.add_argument('--use_specific_path',action='store_true')
     parser.add_argument('--specific_path',type=str, default = None)
     parser.add_argument('--config',type=str, default = "configs/car_perturb.yaml")
     parser.add_argument('--input_image', type = str, default = "./Stanford_Car/images/")
-    parser.add_argument('--adversarial_trained', type =bool, default=True)
+    parser.add_argument('--adversarial_trained', action='store_true')
     args = parser.parse_args()
     test_classifier(args)
