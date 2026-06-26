@@ -63,8 +63,8 @@ python from_scratch.py --target_model inception-v3
 The generated UAEs will be saved in direction: `./<outdir>/<target_model>/samples/`
 ### Tip:
 You can tune following hyper-parameters if you are not satisfied with the generated image:
-* `--optimize_xt.num_iteration_optimize_xt`: The number of optimization steps $G$.
-* `--optimize_xt.lr_xt`: The initial learning rate $\mu_T$
+* `--optimize_xt.num_iteration_optimize_xt`: The number of optimization steps.
+* `--optimize_xt.lr_xt`: The initial learning rate.
 
 
 Please refer to our paper for more details.
