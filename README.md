@@ -78,9 +78,13 @@ Put them into the `pretrianed_models` folder, then run our attack method:
 python main.py --config_file configs/cub_perturb.yaml --input_image ./CUB_200_2011/images --target_model cubSEResnet101 --adaptive True --regional False --outdir ./images/cub/ 
 ```
 ## Evaluation
-To evaluate the generated UAEs on all target models in our paper, run:
+To evaluate the generated UAEs on a specific path, run:
 ```shell
-python test_classifier.py --config_file <config_file> --use_specific_path <True or False> --specific_path <your path of UAEs> --adversarial_trained <True of False>
+python test_classifier.py --config_file <config_file> --use_specific_path --specific_path <your path of UAEs>
+```
+To evaluate the generated UAEs on adversarial trained models, run:
+```shell
+python test_classifier.py --config_file <config_file> --adversarial_trained
 ```
 If `use_pecific_path` is `False`, UAEs in config file's default image folder will be evaluated
 ## Robustness on defensive approches
