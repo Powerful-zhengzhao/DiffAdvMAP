@@ -415,7 +415,7 @@ def main():
             % (float(last_duration), image_name+str(i))
         )
     if os.path.isdir(config.input_image):
-        evaluation(config)
+        evaluation(config,adversarial_trained=False)
     # report batch scores
     for metric_name, metric in METRICS.items():
         recorder.add_with_logging(
